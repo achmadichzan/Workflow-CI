@@ -56,40 +56,40 @@ def main():
 
     print(f"Accuracy: {acc}")
 
-    with mlflow.start_run(run_name="RandomForest_Tuning"):
+    print("Mulai Logging ke MLflow...")
         
-        mlflow.log_params(best_params)
-        
-        mlflow.log_metric("accuracy", acc)
-        mlflow.log_metric("precision", prec)
-        mlflow.log_metric("recall", rec)
+    mlflow.log_params(best_params)
+    
+    mlflow.log_metric("accuracy", acc)
+    mlflow.log_metric("precision", prec)
+    mlflow.log_metric("recall", rec)
 
-        mlflow.sklearn.log_model(best_model, "model")
+    mlflow.sklearn.log_model(best_model, "model")
 
-        plt.figure(figsize=(8, 6))
-        cm = confusion_matrix(y_test, y_pred)
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Benign', 'Malignant'], yticklabels=['Benign', 'Malignant'])
-        plt.title('Confusion Matrix')
-        plt.ylabel('Actual')
-        plt.xlabel('Predicted')
-        
-        cm_path = "confusion_matrix.png"
-        plt.savefig(cm_path)
-        plt.close()
-        
-        mlflow.log_artifact(cm_path)
-        print("Artefak 1 (Confusion Matrix) terupload.")
+    plt.figure(figsize=(8, 6))
+    cm = confusion_matrix(y_test, y_pred)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Benign', 'Malignant'], yticklabels=['Benign', 'Malignant'])
+    plt.title('Confusion Matrix')
+    plt.ylabel('Actual')
+    plt.xlabel('Predicted')
+    
+    cm_path = "confusion_matrix.png"
+    plt.savefig(cm_path)
+    plt.close()
+    
+    mlflow.log_artifact(cm_path)
+    print("Artefak 1 (Confusion Matrix) terupload.")
 
-        report = classification_report(y_test, y_pred)
-        report_path = "classification_report.txt"
-        with open(report_path, "w") as f:
-            f.write(report)
-        
-        mlflow.log_artifact(report_path)
-        print("Artefak 2 (Classification Report) terupload.")
+    report = classification_report(y_test, y_pred)
+    report_path = "classification_report.txt"
+    with open(report_path, "w") as f:
+        f.write(report)
+    
+    mlflow.log_artifact(report_path)
+    print("Artefak 2 (Classification Report) terupload.")
 
-        if os.path.exists(cm_path): os.remove(cm_path)
-        if os.path.exists(report_path): os.remove(report_path)
+    if os.path.exists(cm_path): os.remove(cm_path)
+    if os.path.exists(report_path): os.remove(report_path)
 
     print("Proses Training & Logging ke DagsHub Selesai!")
 
