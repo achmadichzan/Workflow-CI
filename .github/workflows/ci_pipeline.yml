@@ -8,6 +8,8 @@ on:
 jobs:
   train-and-build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - name: Checkout Code
@@ -29,7 +31,17 @@ jobs:
         MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_PASSWORD }}
       run: |
         cd MLProject
+        # Pastikan training berjalan dan menghasilkan file output di folder ini
         mlflow run . --env-manager=local --experiment-name Breast_Cancer_CI_Pipeline --run-name RandomForest_Tuning
+
+    - name: Upload Artifacts to GitHub
+      uses: actions/upload-artifact@v4
+      with:
+        name: training-results
+        path: |
+          MLProject/*.png
+          MLProject/*.txt
+          MLProject/mlruns/
 
     - name: Login to Docker Hub
       uses: docker/login-action@v2

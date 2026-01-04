@@ -9,9 +9,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, classification_report
 
-DAGSHUB_USERNAME = "AchmadIchzan"
-DAGSHUB_REPO_NAME = "Eksperimen_SML_AchmadIchzan"
-
 mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI"))
 mlflow.set_experiment("Breast_Cancer_CI_Pipeline")
 
@@ -25,7 +22,7 @@ def main():
         train_df = pd.read_csv(train_path)
         test_df = pd.read_csv(test_path)
     except FileNotFoundError:
-        print(f"Error: File data tidak ditemukan di {train_path}. Pastikan folder preprocessing sudah disalin.")
+        print(f"Error: File data tidak ditemukan di {train_path}.")
         return
 
     X_train = train_df.drop('diagnosis', axis=1)
@@ -87,9 +84,6 @@ def main():
     
     mlflow.log_artifact(report_path)
     print("Artefak 2 (Classification Report) terupload.")
-
-    if os.path.exists(cm_path): os.remove(cm_path)
-    if os.path.exists(report_path): os.remove(report_path)
 
     print("Proses Training & Logging ke DagsHub Selesai!")
 
