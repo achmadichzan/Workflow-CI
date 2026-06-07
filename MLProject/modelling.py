@@ -14,7 +14,15 @@ def train_ci():
     args = parser.parse_args()
 
     # Hubungkan ke DagsHub agar hasil re-train tercatat otomatis secara online
-    dagshub.init(repo_owner='achmadichzan', repo_name='Eksperimen_SML_Achmadichzan', mlflow=True)
+    # Jika berjalan di GitHub Actions, kita set tracking URI secara langsung tanpa lewat browser OAuth
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        print("Berjalan di GitHub Actions. Mengonfigurasi MLflow tracking secara otomatis...")
+        mlflow.set_tracking_uri("https://dagshub.com/achmadichzan/Eksperimen_SML_Achmadichzan.mlflow")
+    else:
+        # Jika berjalan di lokal komputer Achmad, tetap gunakan login interaktif biasa
+        print("Berjalan di lingkungan lokal. Menginisialisasi DagsHub...")
+        dagshub.init(repo_owner='achmadichzan', repo_name='Eksperimen_SML_Achmadichzan', mlflow=True)
+        
     mlflow.set_experiment("Breast_Cancer_Workflow_CI")
 
     # Load data
