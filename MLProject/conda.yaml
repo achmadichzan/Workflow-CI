@@ -1,13 +1,15 @@
-name: mlops-env
+name: breast_cancer_ci_env
 channels:
   - conda-forge
+  - defaults
 dependencies:
-  - python=3.12
+  - python=3.12.7
   - pip
   - pip:
-    - pandas
-    - scikit-learn
-    - mlflow==2.19.0
-    - dagshub
-    - matplotlib
-    - seaborn
+      - mlflow==2.19.0
+      - dagshub
+      - pandas
+      - numpy
+      - scikit-learn
+      - matplotlib
+      - seaborn

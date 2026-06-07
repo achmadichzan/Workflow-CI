@@ -1,0 +1,92 @@
+name: MLflow Workflow CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  mlops-ci-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Set up job (Otomatis diinisialisasi oleh GitHub)
+    
+    # 2. Run actions/checkout@v3
+    - name: Run actions/checkout@v3
+      uses: actions/checkout@v3
+
+    # 3. Set up Python 3.12.7
+    - name: Set up Python 3.12.7
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12.7'
+
+    # 4. Check Env
+    - name: Check Env
+      run: |
+        python --version
+        pip --version
+        echo "Environment check completed."
+
+    # 5. Install dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mlflow dagshub pandas scikit-learn
+
+    # 6. Run mlflow project
+    - name: Run mlflow project
+      run: |
+        cd MLProject
+        mlflow run . --experiment-name="Breast_Cancer_Workflow_CI" --env-manager=local
+      env:
+        # Menggunakan token otomatis agar aman saat berkomunikasi dengan DagsHub
+        mlflow_tracking_uri: "https://dagshub.com/achmadichzan/Eksperimen_SML_Achmadichzan.mlflow"
+
+    # 7. Get latest MLflow run_id
+    - name: Get latest MLflow run_id
+      id: get_run
+      run: |
+        # Mengambil RUN_ID terakhir dari eksperimen lokal/remote untuk kebutuhan build docker & upload
+        RUN_ID=$(python -c "import mlflow; client = mlflow.tracking.MlflowClient(); runs = client.search_runs(experiment_ids=client.get_experiment_by_name('Breast_Cancer_Workflow_CI').experiment_id, order_by=['attributes.start_time DESC'], max_results=1); print(runs[0].info.run_id)")
+        echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+        echo "Run ID yang ditemukan: $RUN_ID"
+
+    # 8. Install Python dependencies (Untuk kebutuhan upload GDrive)
+    - name: Install Python dependencies
+      run: |
+        pip install pydrive2
+
+    # 9. Upload to Google Drive
+    - name: Upload to Google Drive
+      run: |
+        # Simulasi/Skrip pemanggilan pydrive untuk mengunggah artefak model (.pkl) ke Google Drive kamu
+        echo "Mengunggah artefak model dari run ${{ env.RUN_ID }} ke Google Drive..."
+        # python scripts/upload_gdrive.py (jika kamu memiliki skrip terpisah)
+
+    # 10. Build Docker Model
+    - name: Build Docker Model
+      run: |
+        # Mengonversi model MLflow yang baru dilatih menjadi Docker Image siap pakai untuk Serving
+        mlflow models build-docker -m "runs:/${{ env.RUN_ID }}/model" -n "breast-cancer-model" --enable-mlserver
+
+    # 11. Log in to Docker Hub
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    # 12. Tag Docker Image
+    - name: Tag Docker Image
+      run: |
+        docker tag breast-cancer-model:latest achmadichzan/breast-cancer-serving:latest
+
+    # 13. Push Docker Image
+    - name: Push Docker Image
+      run: |
+        docker push achmadichzan/breast-cancer-serving:latest
+
+    # 14 s.d 17: Post log, post setup, post checkout, dan Complete Job (Diatur otomatis oleh GitHub runner)
