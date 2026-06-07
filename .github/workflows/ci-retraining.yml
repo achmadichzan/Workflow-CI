@@ -36,7 +36,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install mlflow dagshub pandas scikit-learn pydrive2
 
-    # 6. Run mlflow project
+    # 6. Run mlflow project & Tangkap Run ID Secara Langsung
     - name: Run mlflow project
       env:
         MLFLOW_TRACKING_URI: "https://dagshub.com/achmadichzan/Eksperimen_SML_Achmadichzan.mlflow"
@@ -44,16 +44,21 @@ jobs:
         MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
         cd MLProject
-        mlflow run . --experiment-name="Breast_Cancer_Workflow_CI" --env-manager=local
-
-    # 7. Get latest MLflow run_id
-    - name: Get latest MLflow run_id
-      id: get_run
-      run: |
-        # Mengambil RUN_ID dari tracking lokal/DagsHub untuk kebutuhan pembungkusan Docker
-        RUN_ID=$(python -c "import mlflow; client = mlflow.tracking.MlflowClient(); runs = client.search_runs(experiment_ids=client.get_experiment_by_name('Breast_Cancer_Workflow_CI').experiment_id, order_by=['attributes.start_time DESC'], max_results=1); print(runs[0].info.run_id if runs else 'no_run_found')")
+        # Jalankan MLflow dan simpan seluruh teks log output ke dalam file temp_log.txt
+        mlflow run . --experiment-name="Breast_Cancer_Workflow_CI" --env-manager=local | tee temp_log.txt
+        
+        # Ekstrak ID run dari teks log menggunakan penanda kata 'ID'
+        RUN_ID=$(grep -oP "Run \(ID '\K[^']+" temp_log.txt || echo "no_run_found")
         echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-        echo "Run ID yang ditemukan: $RUN_ID"
+        echo "Run ID berhasil diamankan: $RUN_ID"
+
+    # 7. Verifikasi MLflow run_id (Menggantikan script Python lama yang error)
+    - name: Get latest MLflow run_id
+      run: |
+        echo "Menggunakan RUN_ID dari env: ${{ env.RUN_ID }}"
+        if [ "${{ env.RUN_ID }}" = "no_run_found" ] || [ -z "${{ env.RUN_ID }}" ]; then
+          echo "Peringatan: Gagal menangkap RUN_ID dari log eksekusi."
+        fi
 
     # 8. Install Python dependencies
     - name: Install Python dependencies
