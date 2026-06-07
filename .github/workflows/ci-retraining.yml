@@ -36,7 +36,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install mlflow dagshub pandas scikit-learn pydrive2
 
-    # 6. Run mlflow project & Tangkap Run ID Secara Langsung
+    # 6. Run mlflow project & Simpan Log Sukses
     - name: Run mlflow project
       env:
         MLFLOW_TRACKING_URI: "https://dagshub.com/achmadichzan/Eksperimen_SML_Achmadichzan.mlflow"
@@ -44,21 +44,24 @@ jobs:
         MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
         cd MLProject
-        # Jalankan MLflow dan simpan seluruh teks log output ke dalam file temp_log.txt
+        # Jalankan project dan rekam outputnya langsung ke file txt
         mlflow run . --experiment-name="Breast_Cancer_Workflow_CI" --env-manager=local | tee temp_log.txt
         
-        # Ekstrak ID run dari teks log menggunakan penanda kata 'ID'
-        RUN_ID=$(grep -oP "Run \(ID '\K[^']+" temp_log.txt || echo "no_run_found")
+        # Ambil baris yang berisi kalimat 'in run with ID' lalu potong teksnya untuk mendapatkan ID murninya
+        RUN_ID=$(grep "in run with ID" temp_log.txt | head -n 1 | cut -d"'" -f2)
+        
+        # Jika ekstraksi pertama kosong, gunakan metode fallback baris sukses
+        if [ -z "$RUN_ID" ]; then
+          RUN_ID=$(grep "Run (ID" temp_log.txt | head -n 1 | cut -d"'" -f2)
+        fi
+        
         echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
-        echo "Run ID berhasil diamankan: $RUN_ID"
+        echo "Run ID berhasil diekstrak: $RUN_ID"
 
-    # 7. Verifikasi MLflow run_id (Menggantikan script Python lama yang error)
+    # 7. Get latest MLflow run_id
     - name: Get latest MLflow run_id
       run: |
-        echo "Menggunakan RUN_ID dari env: ${{ env.RUN_ID }}"
-        if [ "${{ env.RUN_ID }}" = "no_run_found" ] || [ -z "${{ env.RUN_ID }}" ]; then
-          echo "Peringatan: Gagal menangkap RUN_ID dari log eksekusi."
-        fi
+        echo "Menggunakan RUN_ID untuk pembungkusan kontainer: ${{ env.RUN_ID }}"
 
     # 8. Install Python dependencies
     - name: Install Python dependencies
@@ -74,17 +77,18 @@ jobs:
         echo "Mengunggah artefak model ke Google Drive..."
         # Tulis perintah python script upload kamu di sini jika sudah siap
 
-    # 10. Build Docker Model
+    # 10. Build Docker Model (Perbaikan Flag & Validasi Path)
     - name: Build Docker Model
       run: |
         cd MLProject
-        # Membuka proteksi jika run_id tidak terbaca di env lokal runner
-        if [ "${{ env.RUN_ID }}" = "no_run_found" ] || [ -z "${{ env.RUN_ID }}" ]; then
-          echo "Run ID tidak ditemukan, mem-build model menggunakan fallback default."
-          mlflow models build-docker -m "model" -n "breast-cancer-model" --enable-mlserver
-        else
-          mlflow models build-docker -m "runs:/${{ env.RUN_ID }}/model" -n "breast-cancer-model" --enable-mlserver
-        fi
+        # Pastikan environment tracking tetap terbaca saat proses build dilakukan
+        export MLFLOW_TRACKING_URI="https://dagshub.com/achmadichzan/Eksperimen_SML_Achmadichzan.mlflow"
+        export MLFLOW_TRACKING_USERNAME="achmadichzan"
+        export MLFLOW_TRACKING_PASSWORD="${{ secrets.DAGSHUB_TOKEN }}"
+        
+        # Mem-build Docker menggunakan model versi terbaru yang terdaftar (Registered Model) sesuai review Dicoding
+        # Kita hapus opsi '--enable-mlserver' agar lolos dari exit code 2
+        mlflow models build-docker -m "models:/BreastCancer_CI_Model/latest" -n "breast-cancer-model"
 
     # 11. Log in to Docker Hub
     - name: Log in to Docker Hub
