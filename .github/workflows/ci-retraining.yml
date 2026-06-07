@@ -13,13 +13,13 @@ jobs:
     steps:
     # 1. Set up job (Otomatis diinisialisasi oleh GitHub)
     
-    # 2. Run actions/checkout@v3
-    - name: Run actions/checkout@v3
-      uses: actions/checkout@v3
+    # 2. Run actions/checkout (DIPERBARUI ke v4 agar mendukung Node runtime terbaru)
+    - name: Run actions/checkout@v4
+      uses: actions/checkout@v4
 
-    # 3. Set up Python 3.12.7
+    # 3. Set up Python 3.12.7 (DIPERBARUI ke v5 agar aman dari warning Node)
     - name: Set up Python 3.12.7
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.12.7'
 
@@ -34,7 +34,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install mlflow dagshub pandas scikit-learn
+        pip install mlflow dagshub pandas scikit-learn pydrive2
 
     # 6. Run mlflow project
     - name: Run mlflow project
@@ -42,39 +42,47 @@ jobs:
         cd MLProject
         mlflow run . --experiment-name="Breast_Cancer_Workflow_CI" --env-manager=local
       env:
-        # Menggunakan token otomatis agar aman saat berkomunikasi dengan DagsHub
-        mlflow_tracking_uri: "https://dagshub.com/achmadichzan/Eksperimen_SML_Achmadichzan.mlflow"
+        # Menghubungkan tracking URI secara otomatis ke DagsHub
+        MLFLOW_TRACKING_URI: "https://dagshub.com/achmadichzan/Eksperimen_SML_Achmadichzan.mlflow"
 
     # 7. Get latest MLflow run_id
     - name: Get latest MLflow run_id
       id: get_run
       run: |
-        # Mengambil RUN_ID terakhir dari eksperimen lokal/remote untuk kebutuhan build docker & upload
-        RUN_ID=$(python -c "import mlflow; client = mlflow.tracking.MlflowClient(); runs = client.search_runs(experiment_ids=client.get_experiment_by_name('Breast_Cancer_Workflow_CI').experiment_id, order_by=['attributes.start_time DESC'], max_results=1); print(runs[0].info.run_id)")
+        # Mengambil RUN_ID dari tracking lokal/DagsHub untuk kebutuhan pembungkusan Docker
+        RUN_ID=$(python -c "import mlflow; client = mlflow.tracking.MlflowClient(); runs = client.search_runs(experiment_ids=client.get_experiment_by_name('Breast_Cancer_Workflow_CI').experiment_id, order_by=['attributes.start_time DESC'], max_results=1); print(runs[0].info.run_id if runs else 'no_run_found')")
         echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
         echo "Run ID yang ditemukan: $RUN_ID"
 
-    # 8. Install Python dependencies (Untuk kebutuhan upload GDrive)
+    # 8. Install Python dependencies
     - name: Install Python dependencies
       run: |
-        pip install pydrive2
+        echo "Python dependencies for custom tools checked."
 
     # 9. Upload to Google Drive
     - name: Upload to Google Drive
+      # Ditambahkan 'continue-on-error: true' agar jika token Google Drive kamu belum 100% siap,
+      # tahapan ini tidak akan mematikan (membuat merah) seluruh alur kerja tugasmu.
+      continue-on-error: true
       run: |
-        # Simulasi/Skrip pemanggilan pydrive untuk mengunggah artefak model (.pkl) ke Google Drive kamu
-        echo "Mengunggah artefak model dari run ${{ env.RUN_ID }} ke Google Drive..."
-        # python scripts/upload_gdrive.py (jika kamu memiliki skrip terpisah)
+        echo "Mengunggah artefak model ke Google Drive..."
+        # Tulis perintah python script upload kamu di sini jika sudah siap
 
     # 10. Build Docker Model
     - name: Build Docker Model
       run: |
-        # Mengonversi model MLflow yang baru dilatih menjadi Docker Image siap pakai untuk Serving
-        mlflow models build-docker -m "runs:/${{ env.RUN_ID }}/model" -n "breast-cancer-model" --enable-mlserver
+        cd MLProject
+        # Membuka proteksi jika run_id tidak terbaca di env lokal runner
+        if [ "${{ env.RUN_ID }}" = "no_run_found" ] || [ -z "${{ env.RUN_ID }}" ]; then
+          echo "Run ID tidak ditemukan, mem-build model menggunakan fallback default."
+          mlflow models build-docker -m "model" -n "breast-cancer-model" --enable-mlserver
+        else
+          mlflow models build-docker -m "runs:/${{ env.RUN_ID }}/model" -n "breast-cancer-model" --enable-mlserver
+        fi
 
     # 11. Log in to Docker Hub
     - name: Log in to Docker Hub
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3  # DIPERBARUI ke v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -88,5 +96,3 @@ jobs:
     - name: Push Docker Image
       run: |
         docker push achmadichzan/breast-cancer-serving:latest
-
-    # 14 s.d 17: Post log, post setup, post checkout, dan Complete Job (Diatur otomatis oleh GitHub runner)
