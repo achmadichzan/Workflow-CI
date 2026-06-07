@@ -38,12 +38,14 @@ jobs:
 
     # 6. Run mlflow project
     - name: Run mlflow project
+      env:
+        # Pustaka dagshub dan mlflow otomatis membaca token ini untuk bypass login secara aman
+        DAGSHUB_CLIENT_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        MLFLOW_TRACKING_USERNAME: "achmadichzan"
+        MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
       run: |
         cd MLProject
         mlflow run . --experiment-name="Breast_Cancer_Workflow_CI" --env-manager=local
-      env:
-        # Menghubungkan tracking URI secara otomatis ke DagsHub
-        MLFLOW_TRACKING_URI: "https://dagshub.com/achmadichzan/Eksperimen_SML_AchmadIchzan.mlflow"
 
     # 7. Get latest MLflow run_id
     - name: Get latest MLflow run_id
